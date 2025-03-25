@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ClinAgenda.src.Core.Interfaces;
 using ClinAgendaAPI;
 using ClinAgendaDemo.src.Application.DTOs.Patient;
 using Dapper;
@@ -10,7 +11,7 @@ using MySql.Data.MySqlClient;
 
 namespace ClinAgendaDemo.src.Infrastructure.Repositories
 {
-    public class PatientRepository
+    public class PatientRepository : IPatientRepository
     {
          private readonly MySqlConnection _connection;
 

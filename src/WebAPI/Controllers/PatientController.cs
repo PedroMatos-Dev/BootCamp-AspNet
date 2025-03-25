@@ -1,117 +1,96 @@
-using System.Text;
-using ClinAgenda.src.Core.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using ClinAgenda.src.Application.UseCases;
+using ClinAgendaAPI.StatusUseCase;
 using ClinAgendaDemo.src.Application.DTOs.Patient;
-using Dapper;
-using MySql.Data.MySqlClient;
+using Microsoft.AspNetCore.Mvc;
 
-namespace ClinAgenda.src.Infrastructure.Repositories
+namespace ClinAgenda.src.WebAPI.Controllers
 {
-    public class PatientRepository : IPatientRepository
+    public class PatientController : ControllerBase
     {
-        private readonly MySqlConnection _connection;
+        private readonly PatientUseCase _patientUseCase;
+        private readonly StatusUseCase _statusUseCase;
 
-        public PatientRepository(MySqlConnection connection)
+        public PatientController(PatientUseCase patientService, StatusUseCase statusUseCase)
         {
-            _connection = connection;
+            _patientUseCase = patientService;
+            _statusUseCase = statusUseCase;
         }
-
-         public async Task<PatientDTO?> GetByIdAsync(int id)
+        [HttpGet("list")]
+        public async Task<IActionResult> GetPatientsAsync([FromQuery] string? name, [FromQuery] string? documentNumber, [FromQuery] int? patientId, [FromQuery] int itemsPerPage = 10, [FromQuery] int page = 1)
         {
-            const string query = @"
-                SELECT 
-                    ID, 
-                    NAME,
-                    PHONENUMBER,
-                    DOCUMENTNUMBER,
-                    STATUSID,
-                    BIRTHDATE 
-                FROM PATIENT
-                WHERE ID = @Id";
-
-            var patient = await _connection.QueryFirstOrDefaultAsync<PatientDTO>(query, new { Id = id });
-
-            return patient;
-        }
-        public async Task<(int total, IEnumerable<PatientListDTO> patient)> GetPatientsAsync(string? name, string? documentNumber, int? statusId, int itemsPerPage, int page)
-        {
-            var queryBase = new StringBuilder(@"     
-                    FROM PATIENT P
-                    INNER JOIN STATUS S ON S.ID = P.STATUSID
-                    WHERE 1 = 1");
-
-            var parameters = new DynamicParameters();
-
-            if (!string.IsNullOrEmpty(name))
+            try
             {
-                queryBase.Append(" AND P.NAME LIKE @Name");
-                parameters.Add("Name", $"%{name}%");
+                var result = await _patientUseCase.GetPatientsAsync(name, documentNumber, patientId, itemsPerPage, page);
+                return Ok(result);
             }
-
-            if (!string.IsNullOrEmpty(documentNumber))
+            catch (Exception ex)
             {
-                queryBase.Append(" AND P.DOCUMENTNUMBER LIKE @DocumentNumber");
-                parameters.Add("DocumentNumber", $"%{documentNumber}%");
+                return StatusCode(500, $"Erro interno do servidor: {ex.Message}");
             }
-
-            if (statusId.HasValue)
+        }
+        [HttpPost("insert")]
+        public async Task<IActionResult> CreateStatusAsync([FromBody] PatientInsertDTO patient)
+        {
+            try
             {
-                queryBase.Append(" AND S.ID = @StatusId");
-                parameters.Add("StatusId", statusId.Value);
+                var hasStatus = await _statusUseCase.GetStatusByIdAsync(patient.StatusId);
+                if (hasStatus == null)
+                    return BadRequest($"O status ID {patient.StatusId} não existe");
+
+                var createdPatientId = await _patientUseCase.CreatePatientAsync(patient);
+
+                if (!(createdPatientId > 0))
+                {
+                    return StatusCode(500, "Erro ao criar a Paciente.");
+                }
+                var infosPatientCreated = await _patientUseCase.GetPatientByIdAsync(createdPatientId);
+
+                return Ok(infosPatientCreated);
             }
-
-            var countQuery = $"SELECT COUNT(DISTINCT P.ID) {queryBase}";
-            int total = await _connection.ExecuteScalarAsync<int>(countQuery, parameters);
-
-            var dataQuery = $@"
-                    SELECT 
-                        P.ID, 
-                        P.NAME,
-                        P.PHONENUMBER,
-                        P.DOCUMENTNUMBER,
-                        P.BIRTHDATE ,
-                        P.STATUSID AS STATUSID, 
-                        S.NAME AS STATUSNAME
-                    {queryBase}
-                    ORDER BY P.ID
-                    LIMIT @Limit OFFSET @Offset";
-
-            parameters.Add("Limit", itemsPerPage);
-            parameters.Add("Offset", (page - 1) * itemsPerPage);
-
-            var patients = await _connection.QueryAsync<PatientListDTO>(dataQuery, parameters);
-
-            return (total, patients);
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erro interno do Servidor: {ex.Message}");
+            }
         }
-        public async Task<int> InsertPatientAsync(PatientInsertDTO patient)
+        [HttpGet("listById/{id}")]
+        public async Task<IActionResult> GetPatientByIdAsync(int id)
         {
-            string query = @"
-            INSERT INTO Patient (name, phoneNumber, documentNumber, statusId, birthDate) 
-            VALUES (@Name, @PhoneNumber, @DocumentNumber, @StatusId, @BirthDate);
-            SELECT LAST_INSERT_ID();";
-            return await _connection.ExecuteScalarAsync<int>(query, patient);
+            try
+            {
+                var doctor = await _patientUseCase.GetPatientByIdAsync(id);
+                if (doctor == null) return NotFound();
+                return Ok(doctor);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erro interno do Servidor: {ex.Message}");
+            }
         }
-        public async Task<bool> UpdateAsync(PatientDTO patient)
+        [HttpPut("update/{id}")]
+        public async Task<IActionResult> UpdateDoctorAsync(int id, [FromBody] PatientInsertDTO patient)
         {
-            string query = @"
-            UPDATE Patient SET 
-                Name = @Name,
-                phoneNumber = @PhoneNumber,
-                documentNumber = @DocumentNumber,
-                birthDate = @BirthDate,
-                StatusId = @StatusId
-            WHERE Id = @Id;";
-            int rowsAffected = await _connection.ExecuteAsync(query, patient);
-            return rowsAffected > 0;
-        }
-        public async Task<int> DeleteByPatientIdAsync(int id)
-        {
-            string query = "DELETE FROM Patient WHERE ID = @Id";
+            try
+            {
+                if (patient == null) return BadRequest();
 
-            var parameters = new { Id = id };
+                var hasStatus = await _statusUseCase.GetStatusByIdAsync(patient.StatusId);
+                if (hasStatus == null)
+                    return BadRequest($"O status ID {patient.StatusId} não existe");
 
-            var rowsAffected = await _connection.ExecuteAsync(query, parameters);
+                bool updated = await _patientUseCase.UpdatePatientAsync(id, patient);
+                if (!updated) return NotFound("Paciente não encontrado.");
 
-            return rowsAffected;
+                var infosDoctorUpdate = await _patientUseCase.GetPatientByIdAsync(id);
+                return Ok(infosDoctorUpdate);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Erro interno do Servidor: {ex.Message}");
+            }
         }
     }
 }

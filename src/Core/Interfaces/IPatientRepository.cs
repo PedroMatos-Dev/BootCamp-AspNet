@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClinAgendaDemo.src.Application.DTOs.Patient;
 
-namespace ClinAgendaDemo.src.Core.Interfaces
+namespace ClinAgenda.src.Core.Interfaces
 {
-    public class IPatientRepository
+    public interface IPatientRepository
     {
         Task<(int total, IEnumerable<PatientListDTO> patient)> GetPatientsAsync(string? name, string? documentNumber, int? statusId, int itemsPerPage, int page);
         Task<int> InsertPatientAsync(PatientInsertDTO patient);
