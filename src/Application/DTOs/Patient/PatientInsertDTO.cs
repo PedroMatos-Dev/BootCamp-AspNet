@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
-using ClinAgenda.src.Application.DTOs.Status;
 
-namespace ClinAgendaDemo.src.Application.DTOs.Patient
+namespace ClinAgenda.src.Application.DTOs.Patient
 {
-     public class PatientInsertDTO
+    public class PatientInsertDTO
     {
         [Required(ErrorMessage = "O Nome do Paciente é obrigatório", AllowEmptyStrings = false)]
         public required string @Name { get; set; }

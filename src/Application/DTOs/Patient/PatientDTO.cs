@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace ClinAgendaDemo.src.Application.DTOs.Patient
+namespace ClinAgenda.src.Application.DTOs.Patient
 {
     public class PatientDTO
     {

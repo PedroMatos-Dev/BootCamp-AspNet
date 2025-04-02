@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using ClinAgendaDemo.src.Application.DTOs.Patient;
+using ClinAgenda.src.Application.DTOs.Patient;
 
 namespace ClinAgenda.src.Core.Interfaces
 {
@@ -13,5 +13,6 @@ namespace ClinAgenda.src.Core.Interfaces
         Task<PatientDTO?> GetByIdAsync(int id);
         Task<bool> UpdateAsync(PatientDTO patient);
         Task<int> DeleteByPatientIdAsync(int patientId);
+        Task<IEnumerable<PatientListDTO>> AutoComplete(string name);
     }
 }

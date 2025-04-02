@@ -1,26 +1,21 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using ClinAgenda.src.Application.DTOs.Patient;
 using ClinAgenda.src.Core.Interfaces;
-using ClinAgendaAPI;
-using ClinAgendaDemo.src.Application.DTOs.Patient;
 using Dapper;
 using MySql.Data.MySqlClient;
 
-namespace ClinAgendaDemo.src.Infrastructure.Repositories
+namespace ClinAgenda.src.Infrastructure.Repositories
 {
     public class PatientRepository : IPatientRepository
     {
-         private readonly MySqlConnection _connection;
+        private readonly MySqlConnection _connection;
 
         public PatientRepository(MySqlConnection connection)
         {
             _connection = connection;
         }
 
-        public async Task<PatientDTO> GetByIdAsync(int id)
+        public async Task<PatientDTO?> GetByIdAsync(int id)
         {
             const string query = @"
                 SELECT 
@@ -33,11 +28,10 @@ namespace ClinAgendaDemo.src.Infrastructure.Repositories
                 FROM PATIENT
                 WHERE ID = @Id";
 
-            var Patient = await _connection.QueryFirstOrDefaultAsync<PatientDTO>(query, new { Id = id });
+            var patient = await _connection.QueryFirstOrDefaultAsync<PatientDTO>(query, new { Id = id });
 
-            return Patient;
+            return patient;
         }
-
         public async Task<(int total, IEnumerable<PatientListDTO> patient)> GetPatientsAsync(string? name, string? documentNumber, int? statusId, int itemsPerPage, int page)
         {
             var queryBase = new StringBuilder(@"     
@@ -88,7 +82,6 @@ namespace ClinAgendaDemo.src.Infrastructure.Repositories
 
             return (total, patients);
         }
-
         public async Task<int> InsertPatientAsync(PatientInsertDTO patient)
         {
             string query = @"
@@ -120,6 +113,35 @@ namespace ClinAgendaDemo.src.Infrastructure.Repositories
 
             return rowsAffected;
         }
+        public async Task<IEnumerable<PatientListDTO>> AutoComplete(string name)
+        {
+            var queryBase = new StringBuilder(@"     
+                    FROM PATIENT P
+                    INNER JOIN STATUS S ON S.ID = P.STATUSID
+                    WHERE 1 = 1");
 
+            var parameters = new DynamicParameters();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                queryBase.Append(" AND P.NAME LIKE @Name");
+                parameters.Add("Name", $"%{name}%");
+            }
+
+            var dataQuery = $@"
+        SELECT 
+            P.ID, 
+            P.NAME,
+            P.PHONENUMBER,
+            P.DOCUMENTNUMBER,
+            P.BIRTHDATE ,
+            P.STATUSID AS STATUSID, 
+            S.NAME AS STATUSNAME
+        {queryBase}
+        ORDER BY P.ID";
+
+            var doctors = await _connection.QueryAsync<PatientListDTO>(dataQuery, parameters);
+            return doctors;
+        }
     }
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClinAgenda.src.Application.DTOs.Status;
 
-namespace ClinAgendaDemo.src.Application.DTOs.Patient
+namespace ClinAgenda.src.Application.DTOs.Patient
 {
     public class PatientListDTO
     {
